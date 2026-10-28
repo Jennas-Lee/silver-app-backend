@@ -19,6 +19,9 @@ npm run dev                  # http://localhost:3000/api/health
 | `npm run typecheck` | TypeScript 타입 검사 |
 | `npm run build` | 프로덕션 빌드 |
 | `node scripts/try-messages.mjs [서버주소]` | 예시 문자로 문자 판정 API 정확도 시험 |
+| `node scripts/try-kiosk.mjs <사진> "<목표>" [서버주소]` | 키오스크 안내 API를 사진으로 시험 |
+
+키오스크 시험용 사진은 `samples/`에 넣습니다 (git에 올라가지 않음).
 
 ## 배포
 
