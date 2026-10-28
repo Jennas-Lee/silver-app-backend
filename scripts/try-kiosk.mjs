@@ -37,3 +37,19 @@ const body = await res.json();
 
 console.log(`HTTP ${res.status} (${((Date.now() - started) / 1000).toFixed(1)}초)`);
 console.log(JSON.stringify(body, null, 2));
+
+// 어르신용 말투 점검 (src/lib/kiosk/prompt.ts의 안내 규칙과 맞춤)
+if (typeof body.speech === "string") {
+  const JARGON = ["탭", "터치", "클릭", "스크롤", "스와이프", "카테고리", "옵션", "장바구니", "결제", "팝업", "아이콘", "토글", "체크박스", "홈 화면"];
+  const warnings = [];
+  const hits = JARGON.filter((w) => body.speech.includes(w));
+  if (hits.length) warnings.push(`화면 용어: ${hits.join(", ")}`);
+  if (/[A-Za-z]/.test(body.speech)) warnings.push("영어 글자 포함");
+  if (/[()\[\]"'<>/]/.test(body.speech)) warnings.push("기호 포함");
+  const sentences = body.speech.split(/(?<=[.?!요])\s+/).filter(Boolean);
+  if (sentences.length > 2) warnings.push(`문장 ${sentences.length}개 (최대 2개)`);
+  const long = sentences.filter((s) => s.length > 40);
+  if (long.length) warnings.push(`긴 문장 ${long.length}개 (40자 초과)`);
+
+  console.log(`\n말투 점검: ${warnings.length ? "⚠️  " + warnings.join(" / ") : "✅ 통과"}`);
+}

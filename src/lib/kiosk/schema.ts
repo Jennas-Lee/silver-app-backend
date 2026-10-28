@@ -22,7 +22,7 @@ export type KioskGuideRequest = z.infer<typeof KioskGuideRequest>;
 
 /** Claude가 돌려줄 구조화 출력 */
 export const KioskGuideModelOutput = z.object({
-  speech: z.string().describe("어르신께 읽어드릴 안내 한두 문장"),
+  speech: z.string().describe("어르신께 읽어드릴 안내. 쉬운 해요체 한두 문장, 화면 용어와 영어 없이"),
   status: z.enum(["in_progress", "done", "need_input", "unclear"]),
   target: z
     .object({
