@@ -18,6 +18,7 @@ npm run dev                  # http://localhost:3000/api/health
 | `npm run lint` | ESLint |
 | `npm run typecheck` | TypeScript 타입 검사 |
 | `npm run build` | 프로덕션 빌드 |
+| `node scripts/try-messages.mjs [서버주소]` | 예시 문자로 문자 판정 API 정확도 시험 |
 
 ## 배포
 
