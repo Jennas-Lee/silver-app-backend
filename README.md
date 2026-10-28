@@ -21,16 +21,16 @@ npm run dev                  # http://localhost:3000/api/health
 
 ## 배포
 
-Vercel의 Git 자동 배포는 끄고(`vercel.json`), GitHub Actions에서 배포합니다.
+배포는 Vercel의 GitHub 연동이 자동으로 합니다. GitHub Actions는 검사만 합니다.
 
-| 워크플로 | 실행 시점 | 결과 |
+| 담당 | 실행 시점 | 결과 |
 |---|---|---|
-| `ci.yml` | PR, `main` push | lint, 타입 검사, 빌드 |
-| `deploy-preview.yml` | PR | 미리보기 배포 후 PR에 URL 댓글 |
-| `deploy-production.yml` | `main` push | 프로덕션 배포 후 health 확인 |
+| Vercel | PR 브랜치 push | 미리보기 배포, Vercel 봇이 PR에 URL 댓글 |
+| Vercel | `main` push | 프로덕션 배포 |
+| GitHub Actions `ci.yml` | PR, `main` push | lint, 타입 검사, 빌드 |
 
-- GitHub Secrets: `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`
 - 런타임 환경변수(`ANTHROPIC_API_KEY`, `DEVICE_TOKENS`)는 Vercel 프로젝트에 등록합니다.
+- 리전은 `vercel.json`에서 서울(`icn1`)로 지정합니다.
 
 ## 기여 방법
 
