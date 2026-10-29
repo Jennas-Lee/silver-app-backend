@@ -42,3 +42,6 @@ next-env.d.ts
 
 # env 예시는 커밋
 !.env.example
+
+# 평가 결과 (데이터셋 원문 포함)
+/eval-results/
