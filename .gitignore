@@ -45,3 +45,6 @@ next-env.d.ts
 
 # 평가 결과 (데이터셋 원문 포함)
 /eval-results/
+
+# 키오스크 시험 사진 (개인 촬영물)
+/samples/
