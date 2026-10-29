@@ -21,7 +21,8 @@ export async function guideKiosk(req: KioskGuideRequest): Promise<KioskGuideMode
       effort: EFFORT,
       format: betaZodOutputFormat(KioskGuideModelOutput),
     },
-    system: KIOSK_SYSTEM_PROMPT,
+    // 안내 규칙(system)은 모든 요청이 같으므로 캐시해서 다시 쓴다. 사진과 목표(messages)는 매번 달라 캐시하지 않는다.
+    system: [{ type: "text", text: KIOSK_SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
     messages: [
       {
         role: "user",
@@ -38,7 +39,10 @@ export async function guideKiosk(req: KioskGuideRequest): Promise<KioskGuideMode
       event: "kiosk_guide",
       model: response.model,
       stop_reason: response.stop_reason,
+      status: response.parsed_output?.status,
       input_tokens: response.usage.input_tokens,
+      cache_creation_input_tokens: response.usage.cache_creation_input_tokens ?? 0,
+      cache_read_input_tokens: response.usage.cache_read_input_tokens ?? 0,
       output_tokens: response.usage.output_tokens,
     }),
   );
