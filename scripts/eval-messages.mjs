@@ -4,7 +4,7 @@
 // 데이터: https://huggingface.co/datasets/jmjmjm3/kor-smishing-message (CC BY-NC-SA 4.0, 저장소에 포함하지 않음)
 //
 // 사용법:
-//   node scripts/eval-messages.mjs <smishing.csv> [서버 주소] [클래스당 개수=100] [시드=42]
+//   node scripts/eval-messages.mjs <smishing.csv | rules-flagged.jsonl> [서버 주소] [클래스당 개수=100] [시드=42]
 // 예:
 //   node scripts/eval-messages.mjs ../.data/kor-smishing/smishing.csv http://localhost:3000 100
 // 기기 토큰은 환경변수 DEVICE_TOKEN (기본값 dev-token-1).
@@ -52,15 +52,25 @@ function rng(seed) {
   };
 }
 
-const [, ...data] = parseCsv(readFileSync(csvPath, "utf8").replace(/^﻿/, ""));
-const seen = new Set();
+// 입력: 데이터셋 CSV, 또는 앱의 1차 규칙이 서버로 넘긴 메시지 목록(rules-flagged.jsonl, ruleHits 포함).
+// jsonl을 쓰면 실제 앱과 같은 흐름(규칙 통과 → 서버 판정)으로 평가한다.
 const all = [];
-for (const r of data) {
-  const content = r[0]?.trim();
-  const label = r[1]?.trim();
-  if (!content || content.length > 2000 || seen.has(content) || (label !== "정상" && label !== "스미싱")) continue;
-  seen.add(content);
-  all.push({ content, smishing: label === "스미싱" });
+if (csvPath.endsWith(".jsonl")) {
+  for (const line of readFileSync(csvPath, "utf8").split("\n")) {
+    if (!line.trim()) continue;
+    const r = JSON.parse(line);
+    if (r.content.length <= 2000) all.push({ content: r.content, smishing: r.smishing, hits: r.hits ?? [] });
+  }
+} else {
+  const [, ...data] = parseCsv(readFileSync(csvPath, "utf8").replace(/^﻿/, ""));
+  const seen = new Set();
+  for (const r of data) {
+    const content = r[0]?.trim();
+    const label = r[1]?.trim();
+    if (!content || content.length > 2000 || seen.has(content) || (label !== "정상" && label !== "스미싱")) continue;
+    seen.add(content);
+    all.push({ content, smishing: label === "스미싱", hits: [] });
+  }
 }
 
 const rand = rng(Number(seedArg));
@@ -79,7 +89,7 @@ async function classify(s) {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-Device-Token": process.env.DEVICE_TOKEN ?? "dev-token-1" },
       // 데이터셋에 보낸 사람 정보가 없으므로 연락처에 없는 국내 번호로 가정
-      body: JSON.stringify({ source: "sms", sender: "01012345678", senderInContacts: false, body: s.content, ruleHits: [] }),
+      body: JSON.stringify({ source: "sms", sender: "01012345678", senderInContacts: false, body: s.content, ruleHits: s.hits.slice(0, 20) }),
     });
     const out = await res.json().catch(() => ({}));
     if (res.ok) return { ...s, ...out, ms: Date.now() - started };
@@ -116,7 +126,7 @@ const precision = tp / (tp + fp || 1);
 const recall = tp / (sm.length || 1);
 const f1 = (2 * precision * recall) / (precision + recall || 1);
 
-const JARGON = ["탭", "터치", "클릭", "링크", "URL", "스크롤", "앱", "APK", "결제", "팝업", "아이콘"];
+const JARGON = ["탭", "터치", "클릭", "링크", "URL", "스크롤", "앱", "어플", "APK", "결제", "사이트", "스미싱", "피싱", "팝업", "아이콘"];
 const speechOk = ok.filter((r) => {
   const reason = r.reason ?? "";
   return !JARGON.some((w) => reason.includes(w)) && !/[A-Za-z]/.test(reason) && reason.split(/(?<=[.?!요])\s+/).filter(Boolean).length <= 2;
