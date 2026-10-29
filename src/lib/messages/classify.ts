@@ -21,7 +21,9 @@ export async function classifyMessage(req: ClassifyRequest): Promise<ClassifyRes
       effort: EFFORT,
       format: betaZodOutputFormat(ClassifyResult),
     },
-    system: CLASSIFY_SYSTEM_PROMPT,
+    // 판정 규칙(system)은 모든 요청이 같으므로 캐시해서 다시 쓴다. 문자 내용(messages)은 매번 달라 캐시하지 않는다.
+    // 5분 동안 같은 규칙으로 요청이 없으면 캐시가 사라지고, 다음 요청에서 다시 저장한다.
+    system: [{ type: "text", text: CLASSIFY_SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
     messages: [{ role: "user", content: buildClassifyUserText(req) }],
   });
 
@@ -32,6 +34,8 @@ export async function classifyMessage(req: ClassifyRequest): Promise<ClassifyRes
       stop_reason: response.stop_reason,
       verdict: response.parsed_output?.verdict,
       input_tokens: response.usage.input_tokens,
+      cache_creation_input_tokens: response.usage.cache_creation_input_tokens ?? 0,
+      cache_read_input_tokens: response.usage.cache_read_input_tokens ?? 0,
       output_tokens: response.usage.output_tokens,
     }),
   );
