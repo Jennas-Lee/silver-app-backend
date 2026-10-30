@@ -8,9 +8,9 @@ updates:
       minor-and-patch:
         update-types: [minor, patch]
     ignore:
-      # typescript-eslint(eslint-config-next)가 TypeScript 7을 아직 지원하지 않음. 지원되면 이 줄을 지운다.
+      # typescript-eslint(eslint-config-next)는 TypeScript 6.0까지만 지원 (peer: <6.1.0). 지원 범위가 넓어지면 함께 올린다.
       - dependency-name: "typescript"
-        versions: [">=7"]
+        versions: [">=6.1"]
       # 타입은 실제 서버(Vercel) Node 버전(24)에 맞춘다. 서버 Node를 올릴 때 함께 올린다.
       - dependency-name: "@types/node"
         update-types: ["version-update:semver-major"]
