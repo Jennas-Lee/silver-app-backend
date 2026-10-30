@@ -20,6 +20,7 @@ npm run dev                  # http://localhost:3000/api/health
 | `npm run build` | 프로덕션 빌드 |
 | `node scripts/try-messages.mjs [서버주소]` | 예시 문자로 문자 판정 API 정확도 시험 |
 | `node scripts/try-kiosk.mjs <사진> "<목표>" [서버주소]` | 키오스크 안내 API를 사진으로 시험 |
+| `node scripts/smoke-accounts.mjs [서버주소]` | 계정·연결·기록 API 전체 흐름 시험 (비용 없음) |
 | `node scripts/eval-kiosk.mjs <사진 폴더> [서버주소] [목표.json]` | 사진 여러 장으로 키오스크 안내 평가 (상태, 누를 곳, 말투, 응답 시간) |
 
 키오스크 시험용 사진은 `samples/`에 넣습니다 (git에 올라가지 않음).

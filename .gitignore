@@ -48,3 +48,6 @@ next-env.d.ts
 
 # 키오스크 시험 사진 (개인 촬영물)
 /samples/
+
+# 로컬 개발용 내장 DB
+/.pglite/
