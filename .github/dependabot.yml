@@ -7,6 +7,13 @@ updates:
     groups:
       minor-and-patch:
         update-types: [minor, patch]
+    ignore:
+      # typescript-eslint(eslint-config-next)가 TypeScript 7을 아직 지원하지 않음. 지원되면 이 줄을 지운다.
+      - dependency-name: "typescript"
+        versions: [">=7"]
+      # 타입은 실제 서버(Vercel) Node 버전(24)에 맞춘다. 서버 Node를 올릴 때 함께 올린다.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: github-actions
     directory: /
     schedule:
