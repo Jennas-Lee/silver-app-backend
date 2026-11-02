@@ -22,3 +22,8 @@ jobs:
       - run: npm run lint
       - run: npm run typecheck
       - run: npm run build
+      - name: Account API smoke test (embedded DB)
+        run: |
+          npx next start -p 3000 &
+          for i in $(seq 1 30); do curl -sf localhost:3000/api/health && break; sleep 1; done
+          node scripts/smoke-accounts.mjs http://localhost:3000

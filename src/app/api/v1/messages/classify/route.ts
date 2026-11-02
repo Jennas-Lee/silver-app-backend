@@ -6,7 +6,7 @@ import { ClassifyRequest } from "@/lib/messages/schema";
 export const maxDuration = 30;
 
 export async function POST(request: Request) {
-  const unauthorized = requireDeviceToken(request);
+  const unauthorized = await requireDeviceToken(request);
   if (unauthorized) return unauthorized;
 
   let body: unknown;

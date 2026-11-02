@@ -10,7 +10,7 @@ export const maxDuration = 60;
 const clamp01 = (n: number) => Math.min(1, Math.max(0, n));
 
 export async function POST(request: Request) {
-  const unauthorized = requireDeviceToken(request);
+  const unauthorized = await requireDeviceToken(request);
   if (unauthorized) return unauthorized;
 
   let body: unknown;

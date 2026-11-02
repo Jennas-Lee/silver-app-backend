@@ -10,7 +10,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 # silver-app-backend 작업 안내 (AI 에이전트용)
 
-어르신용 앱 "실버 도우미"의 백엔드입니다. 사기 문자 판정과 키오스크 화면 안내를 Claude API로 처리합니다. Next.js(App Router)로 만들고 Vercel에 배포합니다.
+어르신용 앱 "실버 도우미"의 백엔드입니다. 사기 문자 판정과 키오스크 화면 안내를 Claude API로 처리하고, 어르신·보호자 계정과 차단 기록 공유를 담당합니다. Next.js(App Router)로 만들고 Vercel에 배포합니다.
 
 - 앱 저장소: [silver-app-android](https://github.com/Jennas-Lee/silver-app-android). 두 저장소를 같은 상위 폴더에 나란히 clone하면 편합니다.
   ```
@@ -29,11 +29,12 @@ cp .env.example .env.local
 npm run dev            # http://localhost:3000/api/health 가 {"status":"ok",...} 이면 준비 완료
 ```
 
-- Node.js 22 이상 (`package.json`의 `engines`, CI는 `.github/workflows/ci.yml` 기준)
+- Node.js 24 이상 (`package.json`의 `engines`, CI는 `.github/workflows/ci.yml` 기준)
 - `.env.local` 값
   - `ANTHROPIC_API_KEY`: 저장소 주인에게 받습니다. 없으면 로컬에서 `ant auth login` 프로필을 써도 됩니다. 문자 판정·키오스크 API만 이 키가 필요합니다.
   - `DEVICE_TOKENS=dev-token-1`: 앱의 `local.properties`의 `device.token`과 같아야 합니다.
-- **비밀 값(API 키, 토큰)은 대화창에 붙여넣거나 출력하지 않습니다.** 필요하면 사용자에게 직접 파일에 넣어 달라고 합니다.
+  - `DATABASE_URL`: 로컬에서는 **비워 둡니다.** 비어 있으면 내장 Postgres(PGlite)를 `.pglite/` 폴더에 만들고 테이블도 자동으로 만듭니다. 처음부터 다시 하려면 서버를 끄고 `.pglite/`를 지웁니다.
+- **비밀 값(API 키, 토큰, DB 주소)은 대화창에 붙여넣거나 출력하지 않습니다.** 필요하면 사용자에게 직접 파일에 넣어 달라고 합니다.
 
 ## 작업을 끝내기 전에 반드시 실행
 
@@ -43,6 +44,13 @@ CI와 같은 검사입니다. 모두 통과해야 PR을 올립니다.
 npm run lint
 npm run typecheck
 npm run build
+```
+
+계정 기능을 바꿨다면 계정 흐름 시험(가입 → 연결 → 기록 공유, CI에서도 실행)도 돌립니다.
+
+```bash
+npm run dev                                   # 다른 창에서
+node scripts/smoke-accounts.mjs http://localhost:3000
 ```
 
 API 동작은 로컬 서버를 띄워 직접 확인합니다.
@@ -64,13 +72,21 @@ node scripts/try-messages.mjs            # 예시 문자 여러 건으로 판정
 | `src/lib/<기능>/prompt.ts` | Claude 시스템 프롬프트 |
 | `src/lib/<기능>/classify.ts`, `guide.ts` | Claude 호출과 후처리 |
 | `src/lib/anthropic.ts` | Claude 클라이언트 (요청당 50초, 재시도 1회) |
-| `src/lib/auth.ts` | 앱 인증, `apiError()` |
+| `src/lib/auth.ts` | 문자 판정·키오스크 API 인증 (로그인 토큰 또는 예전 `X-Device-Token`) |
+| `src/lib/session.ts` | 로그인 토큰 발급·확인, `requireUser(request, role)` |
+| `src/lib/password.ts`, `pii.ts`, `http.ts` | 비밀번호(scrypt), 개인정보 가림, `apiError()`·요청 읽기 |
+| `src/db/schema.ts` | DB 테이블 (Drizzle ORM) |
+| `src/db/index.ts` | DB 연결 `getDb()`. 운영은 Prisma Postgres, 로컬·CI는 PGlite |
+| `drizzle/` | 마이그레이션 SQL (자동 생성, 직접 고치지 않음) |
 | `docs/api/v1.md` | API 명세 |
 | `scripts/` | 시험·평가 스크립트 |
 
 ## 코드 규칙
 
 - **Next.js 16:** 위의 안내대로 `node_modules/next/dist/docs/`를 먼저 읽습니다. 동적 라우트의 `params`는 `await`해야 하고, 타입은 `RouteContext<'/경로/[id]'>`를 씁니다.
+- **DB 스키마를 바꾸면** `src/db/schema.ts`를 고친 뒤 `npm run db:generate`로 `drizzle/`에 마이그레이션을 만들고 같이 커밋합니다. 배포할 때 Vercel 빌드가 `scripts/migrate.mjs`로 자동 적용합니다. 이미 배포된 마이그레이션 파일은 고치지 않습니다.
+- **계정과 권한:** 로그인한 사용자는 `Authorization: Bearer <토큰>`으로 요청합니다. 서버에는 토큰의 해시만 저장합니다. 보호자 API는 `requireUser(request, "guardian")`로 막고, 어르신 기록을 볼 때는 연결(`links`)이 있는지 꼭 확인합니다.
+- **개인정보:** 보호자에게 보이는 문자 내용은 저장할 때 `maskPii()`로 계좌·카드·주민번호 등을 가립니다. 앱의 `PiiMasker`와 같은 규칙을 유지합니다.
 - **입력 검사:** 요청 본문은 zod로 검사합니다. 오류 응답은 항상 `apiError(status, code, message)` 형식 `{ "error": { "code", "message" } }`입니다.
 - **Claude 호출:** 기존 `classify.ts`, `guide.ts`의 방식을 따릅니다. 모델 ID는 직접 박지 말고 환경변수 기본값(`claude-opus-5-5`)을 씁니다. 구조화된 출력(zod), 시스템 프롬프트 캐시, 낮은 effort를 유지합니다. 모델이나 프롬프트를 바꾸면 평가 스크립트로 전후를 비교합니다.
 - **어르신에게 보이거나 들리는 문장** (오류 메시지, 키오스크 음성 안내, 판정 이유 등)
@@ -85,6 +101,7 @@ node scripts/try-messages.mjs            # 예시 문자 여러 건으로 판정
 - Vercel의 GitHub 연동이 자동으로 배포합니다. PR은 미리보기, `main`은 프로덕션입니다.
 - **GitHub Actions에 배포 단계를 넣지 않습니다.** Actions는 검사(CI)만 합니다.
 - 리전은 `vercel.json`의 서울(`icn1`)입니다.
+- DB는 Vercel에 연결된 Prisma Postgres입니다. `DATABASE_URL`(직접 연결, 마이그레이션용)과 `DATABASE_URL_POOLED`(연결 풀, 서버용)가 Production·Preview에 자동으로 들어갑니다. **미리보기와 운영이 같은 DB를 씁니다.** 미리보기에서 시험하면 운영 DB에 데이터가 남습니다.
 
 ## Git 규칙
 
@@ -95,7 +112,7 @@ node scripts/try-messages.mjs            # 예시 문자 여러 건으로 판정
 
 ## 커밋하면 안 되는 것
 
-- `.env.local` 등 비밀 값
+- `.env.local` 등 비밀 값, `.pglite/` (로컬 DB)
 - `samples/` (키오스크 시험 사진), `eval-results/` (평가 결과)
 - 외부 데이터셋. 비영리 라이선스(CC BY-NC-SA 등)라 저장소에 넣지 않습니다.
 
