@@ -10,7 +10,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 # silver-app-backend 작업 안내 (AI 에이전트용)
 
-어르신용 앱 "실버 도우미"의 백엔드입니다. 사기 문자 판정과 키오스크 화면 안내를 Claude API로 처리하고, 어르신·보호자 계정과 차단 기록 공유를 담당합니다. Next.js(App Router)로 만들고 Vercel에 배포합니다.
+어르신용 앱 "실버 도우미"의 백엔드입니다. 사기 문자·위험한 인터넷 주소 판정과 키오스크 화면 안내를 Claude API로 처리하고, 어르신·보호자 계정과 차단 기록 공유를 담당합니다. Next.js(App Router)로 만들고 Vercel에 배포합니다.
 
 - 앱 저장소: [silver-app-android](https://github.com/Jennas-Lee/silver-app-android). 두 저장소를 같은 상위 폴더에 나란히 clone하면 편합니다.
   ```
@@ -46,7 +46,7 @@ npm run typecheck
 npm run build
 ```
 
-계정 기능을 바꿨다면 계정 흐름 시험(가입 → 연결 → 기록 공유, CI에서도 실행)도 돌립니다.
+계정·기록·주소 판정을 바꿨다면 흐름 시험(가입 → 연결 → 기록 공유 → 주소 판정 규칙, CI에서도 실행)도 돌립니다. Claude는 부르지 않습니다.
 
 ```bash
 npm run dev                                   # 다른 창에서
@@ -71,6 +71,8 @@ node scripts/try-messages.mjs            # 예시 문자 여러 건으로 판정
 | `src/lib/<기능>/schema.ts` | zod 스키마 (요청·응답·모델 출력) |
 | `src/lib/<기능>/prompt.ts` | Claude 시스템 프롬프트 |
 | `src/lib/<기능>/classify.ts`, `guide.ts` | Claude 호출과 후처리 |
+| `src/lib/urls/` | 인터넷 주소 판정: `rules.ts`(공식 도메인·단서) → 저장된 판정 → `webrisk.ts` → `classify.ts`, 흐름은 `check.ts` |
+| `src/lib/guardian.ts` | 보호자가 어르신 기록을 볼 때 연결 확인 `requireLinkedSenior()` |
 | `src/lib/anthropic.ts` | Claude 클라이언트 (요청당 50초, 재시도 1회) |
 | `src/lib/auth.ts` | 문자 판정·키오스크 API 인증 (로그인 토큰 또는 예전 `X-Device-Token`) |
 | `src/lib/session.ts` | 로그인 토큰 발급·확인, `requireUser(request, role)` |

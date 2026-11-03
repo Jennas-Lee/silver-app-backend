@@ -76,4 +76,38 @@ export const guardRecords = pgTable(
   (t) => [primaryKey({ columns: [t.seniorId, t.id] }), index("guard_records_senior_received_idx").on(t.seniorId, t.receivedAt)],
 );
 
+/** 인터넷 주소 판정 결과 저장 (같은 주소를 다시 물으면 Claude를 부르지 않는다) */
+export const urlVerdicts = pgTable("url_verdicts", {
+  /** 보통 도메인. 여러 사람이 같이 쓰는 도메인(구글 사이트, 짧은 주소 등)은 도메인 + 경로 */
+  key: text("key").primaryKey(),
+  verdict: text("verdict", { enum: ["safe", "suspicious", "malicious"] }).notNull(),
+  category: text("category").notNull(),
+  reason: text("reason").notNull(),
+  /** rule | webrisk | model */
+  source: text("source").notNull(),
+  checkedAt: timestamp("checked_at", { withTimezone: true }).notNull().defaultNow(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+});
+
+/** 어르신 휴대폰에서 막거나 경고한 인터넷 주소. 주소 뒤의 ?부터는 저장하지 않는다. */
+export const urlRecords = pgTable(
+  "url_records",
+  {
+    id: text("id").notNull(),
+    seniorId: uuid("senior_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    visitedAt: timestamp("visited_at", { withTimezone: true }).notNull(),
+    host: text("host").notNull(),
+    urlMasked: text("url_masked").notNull(),
+    /** 주소를 연 곳 (예: 크롬, 카카오톡, QR) */
+    app: text("app").notNull(),
+    action: text("action", { enum: ["BLOCKED", "WARNED"] }).notNull(),
+    category: text("category").notNull(),
+    reason: text("reason").notNull(),
+    uploadedAt: timestamp("uploaded_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.seniorId, t.id] }), index("url_records_senior_visited_idx").on(t.seniorId, t.visitedAt)],
+);
+
 export type User = typeof users.$inferSelect;

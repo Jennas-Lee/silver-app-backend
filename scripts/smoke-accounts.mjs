@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// 계정·연결·기록 API를 처음부터 끝까지 시험한다 (LLM을 부르지 않아 비용 없음).
+// 계정·연결·기록·주소 판정(규칙 부분) API를 처음부터 끝까지 시험한다 (LLM을 부르지 않아 비용 없음).
 //
 // 사용법:
 //   node scripts/smoke-accounts.mjs [서버 주소]
@@ -84,10 +84,45 @@ check("서버에서도 계좌번호를 가림", list.json?.records?.[0]?.body.in
 const guardians = await call("GET", "/api/v1/links", { token: S });
 check("어르신: 연결된 보호자 목록", guardians.status === 200 && guardians.json.guardians.some((g) => g.email === email), guardians);
 
+// 5-1. 인터넷 주소 판정 (규칙으로 끝나는 주소만 → Claude를 부르지 않음)
+const urlCheck = await call("POST", "/api/v1/urls/check", {
+  token: S,
+  body: { urls: ["https://m.naver.com/news", "http://update-kr.example/files/app.apk", "tel:01012345678"] },
+});
+const [naverR, apkR, telR] = urlCheck.json?.results ?? [];
+check("주소 판정: 공식 도메인은 안전", urlCheck.status === 200 && naverR?.verdict === "safe" && naverR?.source === "rule", urlCheck);
+check("주소 판정: 프로그램(.apk) 주소는 위험", apkR?.verdict === "malicious" && apkR?.category === "malware", apkR);
+check("주소 판정: 인터넷 주소가 아니면 unknown", telR?.verdict === "unknown" && telR?.source === "invalid", telR);
+const urlBad = await call("POST", "/api/v1/urls/check", { token: S, body: { urls: [] } });
+check("주소 판정: 빈 목록 거절", urlBad.status === 400, urlBad);
+
+// 5-2. 막은 주소 기록
+const urlRecs = [
+  { id: `u1-${stamp}`, visitedAt: new Date(Date.now() - 30_000).toISOString(), url: "http://kbstar-login.top/auth?name=kim&acct=110-123-456789", app: "크롬", action: "BLOCKED", category: "phishing", reason: "은행인 척하는 가짜 주소예요." },
+  { id: `u2-${stamp}`, visitedAt: new Date().toISOString(), url: "bit.ly/abc", app: "카카오톡", action: "WARNED", category: "other", reason: "어디로 가는지 알 수 없는 주소예요." },
+];
+const urlUp = await call("POST", "/api/v1/url-records", { token: S, body: { records: urlRecs } });
+check("막은 주소 업로드", urlUp.status === 200 && urlUp.json.saved === 2, urlUp);
+const urlAgain = await call("POST", "/api/v1/url-records", { token: S, body: { records: urlRecs } });
+check("같은 주소 기록은 한 번만 저장", urlAgain.json?.saved === 0, urlAgain);
+const urlList = await call("GET", `/api/v1/seniors/${senior.json.user.id}/url-records`, { token: G });
+const firstUrl = urlList.json?.records?.[1];
+check("보호자: 막은 주소 조회 (최신순)", urlList.status === 200 && urlList.json.records.length === 2 && urlList.json.records[0].id === `u2-${stamp}`, urlList);
+check("주소의 ? 뒤(이름·계좌)는 저장하지 않음", firstUrl?.url === "kbstar-login.top/auth" && firstUrl?.host === "kbstar-login.top", firstUrl);
+const seniors2 = await call("GET", "/api/v1/links", { token: G });
+check("보호자: 최근 7일 막은 주소 수", seniors2.json?.seniors?.find((s) => s.id === senior.json.user.id)?.recentUrlCount === 2, seniors2);
+const guardianUrlUp = await call("POST", "/api/v1/url-records", { token: G, body: { records: urlRecs } });
+check("보호자는 주소 기록을 올릴 수 없음", guardianUrlUp.status === 403, guardianUrlUp);
+const urlDel = await call("DELETE", `/api/v1/url-records/u1-${stamp}`, { token: S });
+const afterUrlDel = await call("GET", `/api/v1/seniors/${senior.json.user.id}/url-records`, { token: G });
+check("어르신이 지운 주소 기록은 보호자 화면에서도 사라짐", urlDel.status === 204 && afterUrlDel.json.records.length === 1, afterUrlDel);
+
 // 6. 권한
 const other = await call("POST", "/api/v1/auth/guardian/signup", { body: { name: "남", email: `other-${stamp}@example.com`, password: "password123" } });
 const otherList = await call("GET", `/api/v1/seniors/${senior.json.user.id}/records`, { token: other.json.token });
 check("연결 안 된 보호자는 기록을 볼 수 없음", otherList.status === 404, otherList);
+const otherUrlList = await call("GET", `/api/v1/seniors/${senior.json.user.id}/url-records`, { token: other.json.token });
+check("연결 안 된 보호자는 막은 주소를 볼 수 없음", otherUrlList.status === 404, otherUrlList);
 const seniorList = await call("GET", `/api/v1/seniors/${senior.json.user.id}/records`, { token: S });
 check("어르신 계정은 보호자 조회 API를 쓸 수 없음", seniorList.status === 403, seniorList);
 const noToken = await call("GET", "/api/v1/links");
