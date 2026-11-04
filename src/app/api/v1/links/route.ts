@@ -7,7 +7,7 @@ import { requireUser, toPublicUser } from "@/lib/session";
 
 /**
  * 연결 목록
- * - 보호자: 연결한 어르신들 (최근 7일 차단·경고 수, 마지막 기록 시각 포함)
+ * - 보호자: 연결한 어르신들 (최근 7일 차단 문자 수·막은 주소 수, 마지막 기록 시각 포함)
  * - 어르신: 연결된 보호자들
  */
 export async function GET(request: Request) {
@@ -37,12 +37,27 @@ export async function GET(request: Request) {
       .groupBy(schema.guardRecords.seniorId);
     const byId = new Map(stats.map((s) => [s.seniorId, s]));
 
+    const urlStats = await db
+      .select({
+        seniorId: schema.urlRecords.seniorId,
+        recentCount: count(sql`case when ${schema.urlRecords.visitedAt} > ${weekAgo} then 1 end`),
+        lastRecordAt: max(schema.urlRecords.visitedAt),
+      })
+      .from(schema.urlRecords)
+      .innerJoin(schema.links, eq(schema.links.seniorId, schema.urlRecords.seniorId))
+      .where(eq(schema.links.guardianId, auth.user.id))
+      .groupBy(schema.urlRecords.seniorId);
+    const urlById = new Map(urlStats.map((s) => [s.seniorId, s]));
+    const latest = (...dates: (Date | null | undefined)[]) =>
+      dates.reduce<Date | null>((a, d) => (d && (!a || d > a) ? d : a), null)?.toISOString() ?? null;
+
     return Response.json({
       seniors: seniors.map(({ user, linkedAt }) => ({
         ...toPublicUser(user),
         linkedAt: linkedAt.toISOString(),
         recentCount: Number(byId.get(user.id)?.recentCount ?? 0),
-        lastRecordAt: byId.get(user.id)?.lastRecordAt?.toISOString() ?? null,
+        recentUrlCount: Number(urlById.get(user.id)?.recentCount ?? 0),
+        lastRecordAt: latest(byId.get(user.id)?.lastRecordAt, urlById.get(user.id)?.lastRecordAt),
       })),
     });
   }
