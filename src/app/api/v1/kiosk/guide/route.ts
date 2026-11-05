@@ -10,7 +10,8 @@ export const maxDuration = 60;
 const clamp01 = (n: number) => Math.min(1, Math.max(0, n));
 
 export async function POST(request: Request) {
-  const unauthorized = await requireDeviceToken(request);
+  // 키오스크 도우미는 Standard 이상
+  const unauthorized = await requireDeviceToken(request, "standard");
   if (unauthorized) return unauthorized;
 
   let body: unknown;

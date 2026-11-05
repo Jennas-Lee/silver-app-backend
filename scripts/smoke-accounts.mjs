@@ -50,6 +50,20 @@ const G = login.json.token;
 const me = await call("GET", "/api/v1/me", { token: G });
 check("내 정보", me.status === 200 && me.json.user.email === email, me);
 
+// 2-1. 구독 (보호자만)
+const sub0 = await call("GET", "/api/v1/subscription", { token: G });
+check("구독: 처음에는 없음", sub0.status === 200 && sub0.json.plan === "none" && sub0.json.updatedAt === null, sub0);
+const subSet = await call("PUT", "/api/v1/subscription", { token: G, body: { plan: "premium" } });
+check("구독: Premium으로 바꾸기", subSet.status === 200 && subSet.json.plan === "premium" && !!subSet.json.updatedAt, subSet);
+const subMe = await call("GET", "/api/v1/me", { token: G });
+check("구독: 내 정보에도 플랜", subMe.json?.user?.plan === "premium", subMe);
+const subBad = await call("PUT", "/api/v1/subscription", { token: G, body: { plan: "gold" } });
+check("구독: 없는 플랜 거절", subBad.status === 400, subBad);
+const subSenior = await call("PUT", "/api/v1/subscription", { token: S, body: { plan: "standard" } });
+check("구독: 어르신은 바꿀 수 없음", subSenior.status === 403, subSenior);
+const subNone = await call("PUT", "/api/v1/subscription", { token: G, body: { plan: "none" } });
+check("구독: 다시 없음으로", subNone.json?.plan === "none" && subNone.json.sharedFrom === null, subNone);
+
 // 3. 보호자 연결 전에는 기능을 쓸 수 없음
 const meBefore = await call("GET", "/api/v1/me", { token: S });
 check("연결 전: 내 정보에 hasGuardian false", meBefore.status === 200 && meBefore.json.user.hasGuardian === false, meBefore);
@@ -74,7 +88,33 @@ check("코드로 연결", link.status === 201 && link.json.senior.name === "김�
 const reuse = await call("POST", "/api/v1/links", { token: G, body: { code: code.json.code } });
 check("같은 코드는 다시 못 씀", reuse.status === 404, reuse);
 const meAfter = await call("GET", "/api/v1/me", { token: S });
-check("연결 후: 내 정보에 hasGuardian true", meAfter.json?.user?.hasGuardian === true, meAfter);
+check("연결 후: 내 정보에 hasGuardian true", meAfter.json?.user?.hasGuardian === true && meAfter.json.user.plan === "none", meAfter);
+
+// 3-2. 플랜: 키오스크는 Standard 이상, 보호자 여러 명은 플랜을 함께 쓰고 한 명만 구독
+const kioskNone = await call("POST", "/api/v1/kiosk/guide", { token: S, body: {} });
+check("플랜 없음: 키오스크 거절", kioskNone.status === 403 && kioskNone.json.error.code === "plan_required", kioskNone);
+const urlNone = await call("POST", "/api/v1/urls/check", { token: S, body: { urls: [] } });
+check("플랜 없음: 주소 판정은 됨 (본문 오류 400)", urlNone.status === 400, urlNone);
+await call("PUT", "/api/v1/subscription", { token: G, body: { plan: "standard" } });
+const kioskStd = await call("POST", "/api/v1/kiosk/guide", { token: S, body: {} });
+check("Standard: 키오스크 통과 (본문 오류 400)", kioskStd.status === 400, kioskStd);
+const meStd = await call("GET", "/api/v1/me", { token: S });
+check("어르신 내 정보에 함께 쓰는 플랜과 구독한 보호자", meStd.json?.user?.plan === "standard" && meStd.json.user.planPayer === "김철수", meStd);
+const g2 = await call("POST", "/api/v1/auth/guardian/signup", { body: { name: "김영희", email: `g2-${stamp}@example.com`, password: "password123" } });
+const G2 = g2.json.token;
+const code2 = await call("POST", "/api/v1/links/code", { token: S });
+await call("POST", "/api/v1/links", { token: G2, body: { code: code2.json.code } });
+const sub2 = await call("GET", "/api/v1/subscription", { token: G2 });
+check("둘째 보호자: 첫째 보호자의 플랜을 함께 씀", sub2.json?.plan === "none" && sub2.json.sharedFrom?.name === "김철수" && sub2.json.sharedFrom?.plan === "standard", sub2);
+const sub2Set = await call("PUT", "/api/v1/subscription", { token: G2, body: { plan: "premium" } });
+check("둘째 보호자: 따로 구독할 수 없음", sub2Set.status === 409 && sub2Set.json.error.code === "already_subscribed", sub2Set);
+await call("PUT", "/api/v1/subscription", { token: G, body: { plan: "none" } });
+const sub2Free = await call("PUT", "/api/v1/subscription", { token: G2, body: { plan: "premium" } });
+check("첫째가 해지하면 둘째가 구독할 수 있음", sub2Free.status === 200 && sub2Free.json.plan === "premium", sub2Free);
+const sub1 = await call("GET", "/api/v1/subscription", { token: G });
+check("이제 첫째가 둘째의 플랜을 함께 씀", sub1.json?.sharedFrom?.name === "김영희" && sub1.json.sharedFrom.plan === "premium", sub1);
+await call("PUT", "/api/v1/subscription", { token: G2, body: { plan: "none" } });
+await call("DELETE", `/api/v1/links/${senior.json.user.id}`, { token: G2 });
 
 // 4. 기록 업로드
 const records = [
