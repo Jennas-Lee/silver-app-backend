@@ -4,11 +4,13 @@ import { getDb, schema } from "@/db";
 import type { User } from "@/db/schema";
 import { apiError } from "./http";
 
-/** 앱에 돌려줄 계정 정보 (비밀번호 해시 제외) */
-export type PublicUser = { id: string; role: User["role"]; name: string; email: string | null };
+/** 앱에 돌려줄 계정 정보 (비밀번호 해시 제외). plan은 보호자만 */
+export type PublicUser = { id: string; role: User["role"]; name: string; email: string | null; plan?: User["plan"] };
 
 export function toPublicUser(u: User): PublicUser {
-  return { id: u.id, role: u.role, name: u.name, email: u.email };
+  const user: PublicUser = { id: u.id, role: u.role, name: u.name, email: u.email };
+  if (u.role === "guardian") user.plan = u.plan;
+  return user;
 }
 
 const hashToken = (token: string) => createHash("sha256").update(token).digest("hex");

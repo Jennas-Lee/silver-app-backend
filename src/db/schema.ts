@@ -11,6 +11,9 @@ export const users = pgTable(
     email: text("email"),
     /** 보호자만 사용. scrypt 해시 */
     passwordHash: text("password_hash"),
+    /** 보호자만 사용. 구독 플랜 (아직 결제 없이 보호자가 직접 고른다) */
+    plan: text("plan", { enum: ["none", "standard", "premium"] }).notNull().default("none"),
+    planUpdatedAt: timestamp("plan_updated_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [uniqueIndex("users_email_unique").on(t.email)],

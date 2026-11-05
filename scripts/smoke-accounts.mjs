@@ -50,6 +50,20 @@ const G = login.json.token;
 const me = await call("GET", "/api/v1/me", { token: G });
 check("내 정보", me.status === 200 && me.json.user.email === email, me);
 
+// 2-1. 구독 (보호자만)
+const sub0 = await call("GET", "/api/v1/subscription", { token: G });
+check("구독: 처음에는 없음", sub0.status === 200 && sub0.json.plan === "none" && sub0.json.updatedAt === null, sub0);
+const subSet = await call("PUT", "/api/v1/subscription", { token: G, body: { plan: "premium" } });
+check("구독: Premium으로 바꾸기", subSet.status === 200 && subSet.json.plan === "premium" && !!subSet.json.updatedAt, subSet);
+const subMe = await call("GET", "/api/v1/me", { token: G });
+check("구독: 내 정보에도 플랜", subMe.json?.user?.plan === "premium", subMe);
+const subBad = await call("PUT", "/api/v1/subscription", { token: G, body: { plan: "gold" } });
+check("구독: 없는 플랜 거절", subBad.status === 400, subBad);
+const subSenior = await call("PUT", "/api/v1/subscription", { token: S, body: { plan: "standard" } });
+check("구독: 어르신은 바꿀 수 없음", subSenior.status === 403, subSenior);
+const subNone = await call("PUT", "/api/v1/subscription", { token: G, body: { plan: "none" } });
+check("구독: 다시 없음으로", subNone.json?.plan === "none", subNone);
+
 // 3. 보호자 연결 전에는 기능을 쓸 수 없음
 const meBefore = await call("GET", "/api/v1/me", { token: S });
 check("연결 전: 내 정보에 hasGuardian false", meBefore.status === 200 && meBefore.json.user.hasGuardian === false, meBefore);
