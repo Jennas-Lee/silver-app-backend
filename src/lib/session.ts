@@ -53,14 +53,39 @@ export async function findUserByRequest(request: Request): Promise<User | null> 
   return row.user;
 }
 
+/** 어르신이 보호자와 한 명 이상 연결되어 있는지 */
+export async function hasGuardian(seniorId: string): Promise<boolean> {
+  const db = await getDb();
+  const rows = await db
+    .select({ id: schema.links.guardianId })
+    .from(schema.links)
+    .where(eq(schema.links.seniorId, seniorId))
+    .limit(1);
+  return rows.length > 0;
+}
+
+/** 보호자와 연결되지 않은 어르신이 기능을 쓰려 할 때 */
+export const guardianRequired = () =>
+  apiError(403, "guardian_required", "보호자와 연결해야 쓸 수 있어요. 가족 휴대폰에 연결 숫자를 넣어 주세요.");
+
+type AuthResult = { user: User; error?: undefined } | { user?: undefined; error: Response };
+
+/**
+ * 기능 API(문자 판정, 주소 판정, 키오스크, 기록 올리기)에서 쓴다.
+ * requireUser와 같고, 어르신 계정은 보호자와 연결되어 있어야 한다.
+ */
+export async function requireActiveUser(request: Request, role?: User["role"]): Promise<AuthResult> {
+  const auth = await requireUser(request, role);
+  if (auth.error) return auth;
+  if (auth.user.role === "senior" && !(await hasGuardian(auth.user.id))) return { error: guardianRequired() };
+  return auth;
+}
+
 /**
  * 로그인이 필요한 API에서 쓴다. 성공하면 { user }, 실패하면 { error: Response }.
  * role을 주면 그 유형의 계정만 허용한다.
  */
-export async function requireUser(
-  request: Request,
-  role?: User["role"],
-): Promise<{ user: User; error?: undefined } | { user?: undefined; error: Response }> {
+export async function requireUser(request: Request, role?: User["role"]): Promise<AuthResult> {
   const user = await findUserByRequest(request);
   if (!user) return { error: apiError(401, "unauthorized", "다시 로그인해 주세요.") };
   if (role && user.role !== role) {

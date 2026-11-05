@@ -2,7 +2,7 @@ import { z } from "zod";
 import { getDb, schema } from "@/db";
 import { apiError, issuesToMessage, readJson } from "@/lib/http";
 import { maskPii } from "@/lib/pii";
-import { requireUser } from "@/lib/session";
+import { requireActiveUser } from "@/lib/session";
 import { normalizeUrl } from "@/lib/urls/normalize";
 
 const UrlRecord = z.object({
@@ -21,7 +21,7 @@ const Body = z.object({ records: z.array(UrlRecord).min(1).max(100) });
  * 같은 ID는 한 번만 저장된다. 주소의 ? 뒤(검색어·로그인 정보 등)는 버리고 개인정보를 가려서 저장한다.
  */
 export async function POST(request: Request) {
-  const auth = await requireUser(request, "senior");
+  const auth = await requireActiveUser(request, "senior");
   if (auth.error) return auth.error;
   const parsed = Body.safeParse(await readJson(request));
   if (!parsed.success) return apiError(400, "invalid_request", issuesToMessage(parsed.error.issues));

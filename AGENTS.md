@@ -32,7 +32,7 @@ npm run dev            # http://localhost:3000/api/health 가 {"status":"ok",...
 - Node.js 24 이상 (`package.json`의 `engines`, CI는 `.github/workflows/ci.yml` 기준)
 - `.env.local` 값
   - `ANTHROPIC_API_KEY`: 저장소 주인에게 받습니다. 없으면 로컬에서 `ant auth login` 프로필을 써도 됩니다. 문자 판정·키오스크 API만 이 키가 필요합니다.
-  - `DEVICE_TOKENS=dev-token-1`: 앱의 `local.properties`의 `device.token`과 같아야 합니다.
+  - `DEVICE_TOKENS=dev-token-1`: 평가 스크립트(`scripts/eval-*.mjs`, `try-*.mjs`)가 로그인 없이 판정 API를 부를 때 씁니다. 앱은 쓰지 않습니다.
   - `DATABASE_URL`: 로컬에서는 **비워 둡니다.** 비어 있으면 내장 Postgres(PGlite)를 `.pglite/` 폴더에 만들고 테이블도 자동으로 만듭니다. 처음부터 다시 하려면 서버를 끄고 `.pglite/`를 지웁니다.
 - **비밀 값(API 키, 토큰, DB 주소)은 대화창에 붙여넣거나 출력하지 않습니다.** 필요하면 사용자에게 직접 파일에 넣어 달라고 합니다.
 
@@ -74,7 +74,7 @@ node scripts/try-messages.mjs            # 예시 문자 여러 건으로 판정
 | `src/lib/urls/` | 인터넷 주소 판정: `rules.ts`(공식 도메인·단서) → 저장된 판정 → `webrisk.ts` → `classify.ts`, 흐름은 `check.ts` |
 | `src/lib/guardian.ts` | 보호자가 어르신 기록을 볼 때 연결 확인 `requireLinkedSenior()` |
 | `src/lib/anthropic.ts` | Claude 클라이언트 (요청당 50초, 재시도 1회) |
-| `src/lib/auth.ts` | 문자 판정·키오스크 API 인증 (로그인 토큰 또는 예전 `X-Device-Token`) |
+| `src/lib/auth.ts` | 문자 판정·주소 판정·키오스크 API 인증 (로그인 토큰, 개발·평가용 `X-Device-Token`). 어르신은 보호자 연결 필수 (`requireActiveUser`) |
 | `src/lib/session.ts` | 로그인 토큰 발급·확인, `requireUser(request, role)` |
 | `src/lib/password.ts`, `pii.ts`, `http.ts` | 비밀번호(scrypt), 개인정보 가림, `apiError()`·요청 읽기 |
 | `src/db/schema.ts` | DB 테이블 (Drizzle ORM) |
