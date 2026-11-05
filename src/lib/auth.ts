@@ -1,5 +1,6 @@
 import { timingSafeEqual } from "node:crypto";
 import { apiError } from "./http";
+import { atLeast, higher, planRequired, seniorPlan, sharedPlan, type Plan } from "./plan";
 import { bearerToken, requireActiveUser } from "./session";
 
 export { apiError };
@@ -9,12 +10,19 @@ export { apiError };
  * - 로그인 토큰(Authorization: Bearer)이 있으면 그 계정으로 허용. 어르신은 보호자와 연결되어 있어야 한다.
  * - 개발·평가 스크립트용: 로그인 토큰이 없고 X-Device-Token이 환경변수 DEVICE_TOKENS(쉼표 구분)에 있으면 허용.
  *   앱은 이 토큰을 쓰지 않는다. 운영 서버에서는 DEVICE_TOKENS를 비워 두거나 앱에 없는 값만 둔다.
+ * minPlan을 주면 그 플랜 이상이어야 한다 (어르신은 연결된 보호자들의 플랜, 보호자는 자기 또는 함께 쓰는 플랜).
  * 실패하면 오류 응답을, 성공하면 null을 돌려준다.
  */
-export async function requireDeviceToken(request: Request): Promise<Response | null> {
+export async function requireDeviceToken(request: Request, minPlan?: Plan): Promise<Response | null> {
   if (bearerToken(request)) {
     const auth = await requireActiveUser(request);
-    return auth.error ?? null;
+    if (auth.error) return auth.error;
+    if (!minPlan) return null;
+    const plan =
+      auth.user.role === "senior"
+        ? (await seniorPlan(auth.user.id)).plan
+        : higher(auth.user.plan, (await sharedPlan(auth.user.id))?.plan ?? "none");
+    return atLeast(plan, minPlan) ? null : planRequired(minPlan);
   }
 
   const token = request.headers.get("x-device-token") ?? "";
